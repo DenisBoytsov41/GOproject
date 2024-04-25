@@ -13,6 +13,7 @@ import (
 )
 
 var apiKey string
+var cache = make(map[string]Results)
 
 type Source struct {
 	ID   interface{} `json:"id"`
@@ -79,6 +80,13 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil || nextPage < 1 {
 		nextPage = 1
 	}
+	cacheKey := fmt.Sprintf("%s:%d", q, nextPage)
+	if cachedResults, ok := cache[cacheKey]; ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		json.NewEncoder(w).Encode(cachedResults)
+		return
+	}
 
 	pageSize := 20
 
@@ -120,6 +128,8 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	if nextPage < 1 {
 		search.NextPage = 1
 	}
+
+	cache[cacheKey] = search.Results
 
 	json.NewEncoder(w).Encode(search)
 }

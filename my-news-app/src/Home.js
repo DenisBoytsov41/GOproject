@@ -1,16 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import './assets/style.css';
-import './assets/button.css'
+import './assets/button.css';
+
+const cacheExpirationTime = 60 * 60 * 1000;
 
 function Home() {
-  const [searchKey, setSearchKey] = useState('');
+  const [searchKey, setSearchKey] = useState(localStorage.getItem('searchKey') || '');
   const [results, setResults] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(parseInt(localStorage.getItem('currentPage'), 10) || 1);
   const [totalPages, setTotalPages] = useState(0);
+  const [visiblePagesCount] = useState(10);
+  const [visiblePages, setVisiblePages] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (results && results.totalResults != null) {
+      setTotalPages(Math.ceil(results.totalResults / 20));
+    }
+  }, [results]);
+
+  useEffect(() => {
+    const startPage = Math.max(1, currentPage - Math.floor(visiblePagesCount / 2));
+    const endPage = Math.min(totalPages, startPage + visiblePagesCount - 1);
+
+    const pages = Array.from({ length: endPage - startPage + 1 }, (_, index) => index + startPage);
+    setVisiblePages(pages);
+  }, [currentPage, totalPages, visiblePagesCount]);
+
+  useEffect(() => {
+    localStorage.setItem('searchKey', searchKey);
+  }, [searchKey]);
+
+  useEffect(() => {
+    localStorage.setItem('currentPage', currentPage);
+  }, [currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1); // Сбрасываем текущую страницу при изменении поискового запроса
+    setResults(''); // Сбрасываем результаты при изменении поискового запроса
+  }, [searchKey]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
+    setLoading(true);
     try {
+      const cachedResults = JSON.parse(localStorage.getItem(searchKey));
+      if (cachedResults && Date.now() - cachedResults.timestamp < cacheExpirationTime) {
+        setResults(cachedResults);
+        setCurrentPage(1);
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch(`http://localhost:5000/search?q=${searchKey}`);
       if (!response.ok) {
         throw new Error('Ошибка при получении данных');
@@ -18,53 +59,54 @@ function Home() {
       const data = await response.json();
       setResults(data);
       setCurrentPage(1);
-      if (data.Results.articles && data.Results.articles.length > 0) {
-        setTotalPages(Math.ceil(data.Results.totalResults / 20));
-      }
-      
+      localStorage.setItem(searchKey, JSON.stringify(data));
     } catch (error) {
       console.error('Ошибка:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleNextPage = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/search?q=${searchKey}&page=${currentPage + 1}`);
-      if (!response.ok) {
-        throw new Error('Ошибка при получении данных');
+    if (currentPage < totalPages) {
+      setLoading(true);
+      try {
+        const response = await fetch(`http://localhost:5000/search?q=${searchKey}&page=${currentPage + 1}`);
+        if (!response.ok) {
+          throw new Error('Ошибка при получении данных');
+        }
+        const data = await response.json();
+        setResults(data);
+        setCurrentPage(currentPage + 1);
+      } catch (error) {
+        console.error('Ошибка:', error);
+      } finally {
+        setLoading(false);
       }
-      const data = await response.json();
-      setResults(data);
-      setCurrentPage(currentPage + 1);
-    } catch (error) {
-      console.error('Ошибка:', error);
     }
   };
 
-  useEffect(() => {
-    console.log(results);
-    if (results.Results != null) {
-      console.log(results.Results.articles);
-      console.log(Array.isArray(results.Results.articles));
-      console.log(results.Results.articles.length);
-    }
-  }, [results]);
-
   const handlePreviousPage = async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/search?q=${searchKey}&page=${currentPage - 1}`);
-      if (!response.ok) {
-        throw new Error('Ошибка при получении данных');
+    if (currentPage > 1) {
+      setLoading(true);
+      try {
+        const response = await fetch(`http://localhost:5000/search?q=${searchKey}&page=${currentPage - 1}`);
+        if (!response.ok) {
+          throw new Error('Ошибка при получении данных');
+        }
+        const data = await response.json();
+        setResults(data);
+        setCurrentPage(currentPage - 1);
+      } catch (error) {
+        console.error('Ошибка:', error);
+      } finally {
+        setLoading(false);
       }
-      const data = await response.json();
-      setResults(data);
-      setCurrentPage(currentPage - 1);
-    } catch (error) {
-      console.error('Ошибка:', error);
     }
   };
 
   const handlePageClick = async (page) => {
+    setLoading(true);
     try {
       const response = await fetch(`http://localhost:5000/search?q=${searchKey}&page=${page}`);
       if (!response.ok) {
@@ -75,6 +117,8 @@ function Home() {
       setCurrentPage(page);
     } catch (error) {
       console.error('Ошибка:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -96,18 +140,19 @@ function Home() {
         <a href="https://github.com/DenisBoytsov41/GOproject/" className="button github-button">Просмотреть на Github</a>
       </header>
       <section className="container">
-        {results ? (
+        {loading && <p>Загрузка...</p>}
+        {!loading && results ? (
           <div className="result-count">
-            {results.Results.totalResults > 0 ? (
-              <p>Найдено <strong>{results.Results.totalResults}</strong> новостей. Вы на странице <strong>{currentPage}</strong> из <strong>{totalPages}</strong>.</p>
+            {results.totalResults > 0 ? (
+              <p>Найдено <strong>{results.totalResults}</strong> новостей. Вы на странице <strong>{currentPage}</strong> из <strong>{totalPages}</strong>.</p>
             ) : (
               <p>Новости по запросу "<strong>{searchKey}</strong>" не найдены.</p>
             )}
           </div>
         ) : null}
-        {results && results.Results.articles && Array.isArray(results.Results.articles) && results.Results.articles.length > 0 ? (
+        {!loading && results && results.articles && Array.isArray(results.articles) && results.articles.length > 0 ? (
           <ul className="search-results">
-            {results.Results.articles.map((article, index) => (
+            {results.articles.map((article, index) => (
               <li key={index} className="news-article">
                 <div>
                   <a target="_blank" rel="noreferrer noopener" href={article.url}>
@@ -124,28 +169,25 @@ function Home() {
             ))}
           </ul>
         ) : null}
-
-        {results && totalPages > 0 ? (
+        {!loading && searchKey && results && totalPages > 0 ? (
           <div className="pagination">
-            {currentPage > 1 && (
-              <button onClick={handlePreviousPage} className="button previous-page">Предыдущая</button>
-            )}
-            {currentPage < totalPages && (
-              <button onClick={handleNextPage} className="button next-page">Следующая</button>
-            )}
+            <button onClick={handlePreviousPage} className="button previous-page" disabled={currentPage === 1}>Предыдущая</button>
+            <button onClick={handleNextPage} className="button next-page" disabled={currentPage === totalPages}>Следующая</button>
           </div>
         ) : null}
-        <div className="page-list">
-          {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
-            <button
-              key={page}
-              onClick={() => handlePageClick(page)}
-              className={currentPage === page ? "button active-page" : "button"}
-            >
-              {page}
-            </button>
-          ))}
-        </div>
+        {!loading && searchKey && (currentPage !== 1 || currentPage !== totalPages) && (
+          <div className="page-list">
+            {visiblePages.map((page) => (
+              <button
+                key={page}
+                onClick={() => handlePageClick(page)}
+                className={currentPage === page ? "button active-page" : "button"}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
