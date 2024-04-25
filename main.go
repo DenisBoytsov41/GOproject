@@ -2,9 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
-	"html/template"
 	"log"
 	"math"
 	"net/http"
@@ -14,8 +12,7 @@ import (
 	"time"
 )
 
-var tpl = template.Must(template.ParseFiles("index.html"))
-var apiKey *string
+var apiKey string
 
 type Source struct {
 	ID   interface{} `json:"id"`
@@ -35,7 +32,7 @@ type Article struct {
 
 func (a *Article) FormatPublishedDate() string {
 	year, month, day := a.PublishedAt.Date()
-	return fmt.Sprintf("%v %d, %d", month, day, year)
+	return fmt.Sprintf("%d %v, %d", day, month, year)
 }
 
 type Results struct {
@@ -54,6 +51,7 @@ type Search struct {
 func (s *Search) IsLastPage() bool {
 	return s.NextPage >= s.TotalPages
 }
+
 func (s *Search) CurrentPage() int {
 	if s.NextPage == 1 {
 		return s.NextPage
@@ -61,93 +59,85 @@ func (s *Search) CurrentPage() int {
 
 	return s.NextPage - 1
 }
+
 func (s *Search) PreviousPage() int {
 	return s.CurrentPage() - 1
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	tpl.Execute(w, nil)
-}
-
 func searchHandler(w http.ResponseWriter, r *http.Request) {
-	u, err := url.Parse(r.URL.String())
+	q := r.URL.Query().Get("q")
+	page := r.URL.Query().Get("page")
 
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal server error"))
+	log.Printf("Получен запрос на поиск новостей с запросом: %s, страница: %s\n", q, page)
+
+	if q == "" {
+		http.Error(w, "Необходим поисковый запрос", http.StatusBadRequest)
 		return
 	}
 
-	params := u.Query()
-	searchKey := params.Get("q")
-	page := params.Get("page")
-	if page == "" {
-		page = "1"
+	nextPage, err := strconv.Atoi(page)
+	if err != nil || nextPage < 1 {
+		nextPage = 1
 	}
 
-	search := &Search{}
-	search.SearchKey = searchKey
-
-	next, err := strconv.Atoi(page)
-	if err != nil {
-		http.Error(w, "Unexpected server error", http.StatusInternalServerError)
-		return
-	}
-
-	search.NextPage = next
 	pageSize := 20
 
-	endpoint := fmt.Sprintf("https://newsapi.org/v2/everything?q=%s&pageSize=%d&page=%d&apiKey=%s&sortBy=publishedAt&language=en", url.QueryEscape(search.SearchKey), pageSize, search.NextPage, *apiKey)
+	endpoint := fmt.Sprintf("https://newsapi.org/v2/everything?q=%s&pageSize=%d&page=%d&apiKey=%s&sortBy=publishedAt&language=ru",
+		url.QueryEscape(q), pageSize, nextPage, apiKey)
 	resp, err := http.Get(endpoint)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		w.WriteHeader(http.StatusInternalServerError)
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, fmt.Sprintf("Не удалось получить данные: %s", resp.Status), http.StatusInternalServerError)
 		return
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&search.Results)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+	var searchResults Results
+	if err := json.NewDecoder(resp.Body).Decode(&searchResults); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	search.TotalPages = int(math.Ceil(float64(search.Results.TotalResults / pageSize)))
+	totalPages := int(math.Ceil(float64(searchResults.TotalResults) / float64(pageSize)))
 
-	if ok := !search.IsLastPage(); ok {
-		search.NextPage++
+	search := Search{
+		SearchKey:  q,
+		NextPage:   nextPage,
+		TotalPages: totalPages,
+		Results:    searchResults,
 	}
 
-	err = tpl.Execute(w, search)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+
+	if nextPage > totalPages {
+		search.NextPage = totalPages
 	}
+	if nextPage < 1 {
+		search.NextPage = 1
+	}
+
+	json.NewEncoder(w).Encode(search)
 }
 
 func main() {
-
-	apiKey = flag.String("apikey", "", "Newsapi.org access key")
-	flag.Parse()
-
-	if *apiKey == "" {
-		log.Fatal("apiKey must be set")
+	apiKey = os.Getenv("NEWS_API_KEY")
+	if apiKey == "" {
+		log.Fatal("Необходимо указать ключ доступа к Newsapi.org в переменной окружения NEWS_API_KEY")
 	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3000"
+		port = "5000"
 	}
 
 	mux := http.NewServeMux()
-	fs := http.FileServer(http.Dir("assets"))
-	mux.Handle("/assets/", http.StripPrefix("/assets/", fs))
-
 	mux.HandleFunc("/search", searchHandler)
-	mux.HandleFunc("/", indexHandler)
-	http.ListenAndServe(":"+port, mux)
+
+	log.Printf("Сервер запущен на порту: %s\n", port)
+	log.Fatal(http.ListenAndServe(":"+port, mux))
 }

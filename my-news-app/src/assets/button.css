@@ -1,0 +1,28 @@
+.page-list {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.page-list button {
+  margin: 0 5px;
+  padding: 5px 10px;
+  background-color: #f0f0f0;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.page-list button:hover {
+  background-color: #e0e0e0;
+}
+
+.page-list button.active-page {
+  background-color: #007bff;
+  color: #ffffff;
+}
+
+.page-list button.active-page:hover {
+  background-color: #0056b3;
+}
