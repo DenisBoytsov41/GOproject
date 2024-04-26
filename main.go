@@ -13,7 +13,6 @@ import (
 )
 
 var apiKey string
-var cache = make(map[string]Results)
 
 type Source struct {
 	ID   interface{} `json:"id"`
@@ -42,6 +41,8 @@ type Results struct {
 	Articles     []Article `json:"articles"`
 }
 
+var cache = make(map[string]Results)
+
 type Search struct {
 	SearchKey  string
 	NextPage   int
@@ -57,7 +58,6 @@ func (s *Search) CurrentPage() int {
 	if s.NextPage == 1 {
 		return s.NextPage
 	}
-
 	return s.NextPage - 1
 }
 
@@ -118,9 +118,10 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		TotalPages: totalPages,
 		Results:    searchResults,
 	}
-
-	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Content-Type", "application/json")
 
 	if nextPage > totalPages {
 		search.NextPage = totalPages
@@ -140,14 +141,21 @@ func main() {
 		log.Fatal("Необходимо указать ключ доступа к Newsapi.org в переменной окружения NEWS_API_KEY")
 	}
 
-	port := os.Getenv("PORT")
+	host := os.Getenv("APP_HOST")
+	if host == "" {
+		host = "127.0.0.1"
+	}
+
+	port := os.Getenv("APP_PORT")
 	if port == "" {
 		port = "5000"
 	}
 
+	addr := "localhost" + ":" + port
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/search", searchHandler)
 
-	log.Printf("Сервер запущен на порту: %s\n", port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	log.Printf("Сервер запущен на адресе: %s\n", addr)
+	log.Fatal(http.ListenAndServe(addr, mux))
 }
