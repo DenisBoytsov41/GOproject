@@ -29,11 +29,11 @@ const useNewsSearch = () => {
       console.log(results);
       try {
         console.log("Я тут");
-        setTotalPages(Math.ceil(results.totalResults / 20));
+        setTotalPages(Math.ceil(results.Results.totalResults / 20));
       }
       catch (error) {
         console.log("Я тут");
-        setTotalPages(Math.ceil(results.Results.totalResults / 20));
+        setTotalPages(Math.ceil(results.totalResults / 20));
       } 
       console.log(currentPage);
       console.log(totalPages);
@@ -80,14 +80,16 @@ const useNewsSearch = () => {
           {
             setResults(data);
             setCurrentPage(1);
-            setTotalPages(Math.ceil(data.totalResults / 20));
+            console.log(data.Results.totalResults);
+            setTotalPages(Math.ceil(data.Results.totalResults / 20));
             localStorage.setItem(`${searchKey}-page-${currentPage}`, JSON.stringify({ data, timestamp: Date.now() }));
           }
           catch(e)
           {
             setResults(data);
             setCurrentPage(1);
-            setTotalPages(Math.ceil(data.Results.totalResults / 20));
+            console.log(data.totalResults);
+            setTotalPages(Math.ceil(data.totalResults / 20));
             localStorage.setItem(`${searchKey}-page-${currentPage}`, JSON.stringify({ data, timestamp: Date.now() }));
           }
           
@@ -203,7 +205,7 @@ const useNewsSearch = () => {
             {
               setResults(data);
               setCurrentPage(prevPage);
-              setTotalPages(Math.ceil(data.totalResults / 20));
+              setTotalPages(Math.ceil(data.Results.totalResults / 20));
               localStorage.setItem(`${searchKey}-page-${prevPage}`, JSON.stringify({ data, timestamp: Date.now() }));
               setLoading(false);
             }
@@ -211,7 +213,7 @@ const useNewsSearch = () => {
             {
               setResults(data);
               setCurrentPage(prevPage);
-              setTotalPages(Math.ceil(data.Results.totalResults / 20));
+              setTotalPages(Math.ceil(data.totalResults / 20));
               localStorage.setItem(`${searchKey}-page-${prevPage}`, JSON.stringify({ data, timestamp: Date.now() }));
               setLoading(false);
             }
@@ -260,11 +262,11 @@ const useNewsSearch = () => {
           setCurrentPage(page);
           try
           {
-            setTotalPages(Math.ceil(data.totalResults / 20));
+            setTotalPages(Math.ceil(data.Results.totalResults / 20));
           }
           catch(e)
           {
-            setTotalPages(Math.ceil(data.Results.totalResults / 20));
+            setTotalPages(Math.ceil(data.totalResults / 20));
           }
           localStorage.setItem(`${searchKey}-page-${page}`, JSON.stringify({ data, timestamp: Date.now() }));
           setLoading(false);

@@ -24,14 +24,14 @@ function Home() {
         <a href="https://github.com/DenisBoytsov41/GOproject/" className="button github-button">Просмотреть на Github</a>
       </header>
       <section className="container">
-        {loading && <p>Загрузка...</p>}
+        {loading && !results && <p>Загрузка...</p>}
         {!loading && results ? (
           <div className="result-count">
           {(() => {
             try {
-              if (results.totalResults > 0) {
+              if (results.Results.totalResults > 0) {
                 return (
-                  <p>Найдено <strong>{results.totalResults}</strong> новостей. Вы на странице <strong>{currentPage}</strong> из <strong>{totalPages}</strong>.</p>
+                  <p>Найдено <strong>{results.Results.totalResults}</strong> новостей. Вы на странице <strong>{currentPage}</strong> из <strong>{totalPages}</strong>.</p>
                 );
               } else {
                 return (
@@ -40,9 +40,9 @@ function Home() {
               }
             } catch (error) {
               try {
-                if (results.Results.totalResults > 0) {
+                if (results.totalResults > 0) {
                   return (
-                    <p>Найдено <strong>{results.Results.totalResults}</strong> новостей. Вы на странице <strong>{currentPage}</strong> из <strong>{totalPages}</strong>.</p>
+                    <p>Найдено <strong>{results.totalResults}</strong> новостей. Вы на странице <strong>{currentPage}</strong> из <strong>{totalPages}</strong>.</p>
                   );
                 } else {
                   return (
@@ -60,10 +60,10 @@ function Home() {
         {!loading && results && (
           (() => {
             try {
-              if (results.articles && Array.isArray(results.articles) && results.articles.length > 0) {
+              if (results.Results.articles && Array.isArray(results.Results.articles) && results.Results.articles.length > 0) {
                 return (
                   <ul className="search-results">
-                    {results.articles.map((article, index) => (
+                    {results.Results.articles.map((article, index) => (
                       <li key={index} className="news-article">
                         <div>
                           <a target="_blank" rel="noreferrer noopener" href={article.url}>
@@ -81,16 +81,14 @@ function Home() {
                   </ul>
                 );
               } else {
-                return (
-                  <p>Новости по запросу "<strong>{searchKey}</strong>" не найдены.</p>
-                );
+                return null;
               }
             } catch (error) {
               try {
-                if (results.Results && results.Results.articles && Array.isArray(results.Results.articles) && results.Results.articles.length > 0) {
+                if (results && results.articles && Array.isArray(results.articles) && results.articles.length > 0) {
                   return (
                     <ul className="search-results">
-                      {results.Results.articles.map((article, index) => (
+                      {results.articles.map((article, index) => (
                         <li key={index} className="news-article">
                           <div>
                             <a target="_blank" rel="noreferrer noopener" href={article.url}>
